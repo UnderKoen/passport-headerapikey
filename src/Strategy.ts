@@ -14,15 +14,18 @@ import { Request } from 'express';
 import { Strategy as PassportStrategy } from 'passport-strategy';
 import { BadRequestError } from './errors/BadRequestError';
 
+type verifiedCallback = (err: Error | null, user?: Object, info?: Object) => void;
+type verifyCallback = ((apiKey: string, verified: verifiedCallback) => void) | ((apiKey: string, req: Request, verified: verifiedCallback) => void);
+
 export class Strategy extends PassportStrategy {
 
     apiKeyHeader: { header: string, prefix: string };
     name: string;
-    verify: (apiKey: string, verified: (err: Error | null, user?: Object, info?: Object) => void, req?: Request) => void;
+    verify: verifyCallback;
     passReqToCallback: boolean;
 
     constructor(header: { header: string, prefix: string }, passReqToCallback: boolean,
-                verify: (apiKey: string, verified: (err: Error | null, user?: Object, info?: Object) => void, req?: Request) => void) {
+                verify: verifyCallback) {
         super();
         this.apiKeyHeader = header || { header: 'X-Api-Key', prefix: '' };
         if (!this.apiKeyHeader.header) this.apiKeyHeader.header = 'X-Api-Key';
@@ -61,8 +64,12 @@ export class Strategy extends PassportStrategy {
             this.success(user, info);
         };
 
-        const optionalCallbackParams = [];
-        if (this.passReqToCallback) optionalCallbackParams.push(req);
-        this.verify(apiKey, verified, ...optionalCallbackParams);
+        if (this.passReqToCallback) {
+            // @ts-ignore should be called with a request
+            this.verify(apiKey, req, verified);
+        } else {
+            // @ts-ignore should be called without a request
+            this.verify(apiKey, verified);
+        }
     }
 }
